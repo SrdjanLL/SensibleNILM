@@ -53,7 +53,7 @@ def downsampled_channels(_aggregate1, _aggregate2, _individual_appliance):
                      _individual_appliance : path to a channel of individual appliance in a home from where downsampling is done
 
         return:
-                    individual_appliance, aggregate - so it can be converted in a torch tensor after that (and possibly some other transformations)
+                    aggregate, individual_appliance - so it can be converted in a torch tensor after that (and possibly some other transformations)
     """
     aggregate = join_aggregate_data(_aggregate1, _aggregate2)
     individual_appliance = read_channel(_individual_appliance)
@@ -62,7 +62,7 @@ def downsampled_channels(_aggregate1, _aggregate2, _individual_appliance):
     individual_appliance = individual_appliance[individual_appliance["Time"].isin(aggregate["Time"])]
     aggregate = aggregate[aggregate["Time"].isin(individual_appliance["Time"])]
     #print("Aggregate data length: ", len(aggregate), ", Individual appliance length: ", len(individual_appliance))
-    return individual_appliance, aggregate
+    return aggregate, individual_appliance
 
 
 def convert_to_tensor(aggregate, individual, window_size):
