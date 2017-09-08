@@ -79,20 +79,20 @@ class MicrowaveREDDDataSet(torch_data.Dataset):
 class DishwasherREDDDataSet(torch_data.Dataset):
     def __init__(self, data_dir, transform=None):
         self.data_dir = data_dir
-        #Reading two mains and microwave data from house1 (Nascimento used this data for training)
+        #Reading two mains and dishwasher data from house1 (Nascimento used this data for training)
         aggregate1, individual1 = data.downsampled_channels(data_dir + "h1/channel_1.dat", data_dir + "h1/channel_2.dat", data_dir + "h1/channel_6.dat")
         #Conversion of data to 2D torch Tensors
         aggregate1,individual1 = data.convert_to_tensor(aggregate1, individual1, DISHWASHER_WINDOW_SIZE)
 
-        #Reading two mains and microwave data from house2 (Nascimento used this data for training)
+        #Reading two mains and dishwasher data from house2 (Nascimento used this data for training)
         aggregate2, individual2 = data.downsampled_channels(data_dir + "h2/channel_1.dat", data_dir + "h2/channel_2.dat", data_dir + "h2/channel_10.dat")
         aggregate2,individual2 = data.convert_to_tensor(aggregate2, individual2, DISHWASHER_WINDOW_SIZE)
 
-        #Reading two mains and microwave data from house3 (Nascimento used this data for testing)
+        #Reading two mains and dishwasher data from house3 (Nascimento used this data for testing)
         aggregate3, individual3 = data.downsampled_channels(data_dir + "h3/channel_1.dat", data_dir + "h3/channel_2.dat", data_dir + "h3/channel_9.dat")
         aggregate3,individual3 = data.convert_to_tensor(aggregate3, individual3, DISHWASHER_WINDOW_SIZE)
 
-        #Reading two mains and microwave data from house4 (Nascimento used this data for testing)
+        #Reading two mains and dishwasher data from house4 (Nascimento used this data for testing)
         aggregate4, individual4 = data.downsampled_channels(data_dir + "h4/channel_1.dat", data_dir + "h4/channel_2.dat", data_dir + "h4/channel_15.dat")
         aggregate4,individual4 = data.convert_to_tensor(aggregate4, individual4, DISHWASHER_WINDOW_SIZE)
 
