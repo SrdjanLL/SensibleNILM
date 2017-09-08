@@ -84,11 +84,11 @@ class DishwasherREDDDataSet(torch_data.Dataset):
         #Conversion of data to 2D torch Tensors
         aggregate1,individual1 = data.convert_to_tensor(aggregate1, individual1, DISHWASHER_WINDOW_SIZE)
 
-        #Reading two mains and dishwasher data from house2 (Nascimento used this data for training)
+        #Reading two mains and dishwasher data from house2 (Nascimento used this data for testing)
         aggregate2, individual2 = data.downsampled_channels(data_dir + "h2/channel_1.dat", data_dir + "h2/channel_2.dat", data_dir + "h2/channel_10.dat")
         aggregate2,individual2 = data.convert_to_tensor(aggregate2, individual2, DISHWASHER_WINDOW_SIZE)
 
-        #Reading two mains and dishwasher data from house3 (Nascimento used this data for testing)
+        #Reading two mains and dishwasher data from house3 (Nascimento used this data for training)
         aggregate3, individual3 = data.downsampled_channels(data_dir + "h3/channel_1.dat", data_dir + "h3/channel_2.dat", data_dir + "h3/channel_9.dat")
         aggregate3,individual3 = data.convert_to_tensor(aggregate3, individual3, DISHWASHER_WINDOW_SIZE)
 
