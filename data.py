@@ -2,6 +2,7 @@ import pandas as pd
 from os import walk
 import numpy as np
 import torch
+import random
 def read_channel(filename):
     """Method to read home channel data from .dat file into panda dataframe
         Args:
@@ -11,11 +12,25 @@ def read_channel(filename):
                 [pandas.Dataframe] of a signle channel_(m) from house(n)
     """
     channel_to_read = pd.read_csv(filename, names=["Time", "Individual_usage"], delim_whitespace=True)
-
     return channel_to_read
 
 def read_all_homes(path): #Point to REDD data directory with homes directories structured as h1, h2, h3, etc.
-    """Returns dictionary of homes with keys "h1", "h2" etc, where each channel is a panda dataframe"""
+    """Returns dictionary of homes with keys "h1", "h2" etc, where each channel is a panda Dataframe
+        Args: path - string containing path to where REDD home folders are located.
+        Return: dictionary in format:
+                                         { h1: {
+                                                channel_1.dat: {
+                                                    values
+                                                },
+                                                channel_2.dat: {
+                                                    values
+                                                }. . .
+                                            },
+                                            h2: {
+
+                                            }. . .
+                                         }
+    """
     homes = {}
     mypath = path
     for (dirpath, dirnames, filenames) in walk(mypath):
@@ -39,44 +54,44 @@ def join_aggregate_data(channel_1, channel_2):
         return:
                 pandas.Datataframe containing sum of Individual_usage from two channels labeled as mains
     """
+    #reading of two mains channels
     aggregate1 = read_channel(channel_1)
     aggregate2 = read_channel(channel_2)
     sum_channels = np.array(aggregate1["Individual_usage"]) + np.array(aggregate2["Individual_usage"])
     aggregate1["Individual_usage"] = sum_channels
     return aggregate1
 
-def downsampled_channels(_aggregate1, _aggregate2, _individual_appliance):
+def downsampled_channels(_aggregate1, _aggregate2, _individual_appliance, read=True):
     """This method is downsampling aggregate data from 1s data to ~4s data as it was sampled for each individual appliance in REDD data
         Args:
-                     _aggregate1 : path to channel_1.dat in a house h(n)
-                     _aggregate2 : path to channel_2.dat in a house h(n)
-                     _individual_appliance : path to a channel of individual appliance in a home from where downsampling is done
+                     _aggregate1 : pandas.Dataframe containing channel_1.dat in a house h(n)
+                     _aggregate2 : pandas.Dataframe containing channel_2.dat in a house h(n)
+                     _individual_appliance : pandas.Dataframe containing channel of individual appliance in a home from where downsampling is done
 
         return:
-                    aggregate, individual_appliance - so it can be converted in a torch tensor after that (and possibly some other transformations)
+                    [pandas.Dataframe] aggregate, individual_appliance - so it can be converted in a torch tensor after that (and possibly some other transformations)
     """
+
     aggregate = join_aggregate_data(_aggregate1, _aggregate2)
     individual_appliance = read_channel(_individual_appliance)
-
     #Dropping aggregate samples which have unix time not contained in time column of individual_appliance
     individual_appliance = individual_appliance[individual_appliance["Time"].isin(aggregate["Time"])]
     aggregate = aggregate[aggregate["Time"].isin(individual_appliance["Time"])]
     #print("Aggregate data length: ", len(aggregate), ", Individual appliance length: ", len(individual_appliance))
     return aggregate, individual_appliance
 
-
 def convert_to_tensor(aggregate, individual, window_size):
     """Method for converting aggregate and individual appliance monitoring data to two torch 2D tensors of the same size so aggregate data is input and
         individual data is desired output.
         Args:
-                aggregate: pandas.Dataframe containing concatenated and downsampled channel data
-                individual: pandas.Dataframe containing channel data for individual appliance
+                aggregate: pandas.Dataframe containing concatenated and downsampled aggregate channels data
+                individual: pandas.Dataframe containing signal from individual appliance channels
                 NOTE: the lengths of aggregate and individual data must be the same.
 
-        return aggregate, individual : Two torch Tensors where each row is of specified window size.
+        return aggregate, individual : Two torch Tensors with data grouped in windows of specified size
     """
 
-    #Converting to numpy array containing only usage (dropping Time column completely).
+    #Converting to numpy array with usage only (dropping Time column completely).
     aggregate = np.array(aggregate["Individual_usage"])
     individual = np.array(individual["Individual_usage"])
 
@@ -97,5 +112,243 @@ def convert_to_tensor(aggregate, individual, window_size):
 
     return aggregate, individual
 
-#myHomes = read_all_homes("data/REDD/")
-#print(downsampled_channels("data/REDD/h1/channel_1.dat", "data/REDD/h1/channel_2.dat", "data/REDD/h1/channel_3.dat"))
+def convert_to_tensor_overlap(aggregate, individual, window_size, stride=100):
+    """Method for converting aggregate and individual appliance monitoring data to two 2D torch Tensor with overlaping windows
+        Args:
+            aggregate: pandas.Dataframe containing concatenated and downsampled aggregate channels data
+            individual: pandas.Dataframe containing singal from individual appliance channels
+            NOTE: the lengths of aggregate and individual data must be the same
+
+        return aggregate, individual : Two tocrh Tensors with data grouped in windows of specified size
+    """
+    #Converting to numpy array with usage only (droppint Time column completely)
+    aggregate = np.array(aggregate["Individual_usage"])
+    individual = np.array(individual["Individual_usage"])
+
+    current_window = [0, window_size]
+    buffer_agg = None
+    buffer_ind = None
+    aggregate_tensor = None
+    individual_tensor = None
+    while (current_window[1] < len(aggregate) - 1):
+        # do .... do ... do ...
+        #Getting windows from data and putting them into torch.Tensor buffers (Conversion of numpy arrays)
+        buffer_agg = torch.from_numpy(aggregate[current_window[0]: current_window[1]])
+        buffer_ind = torch.from_numpy(individual[current_window[0]: current_window[1]])
+
+        #Reshaping vector buffers so they can be concatenated as rows to the final tensor
+        buffer_agg = buffer_agg.view(1, -1)
+        buffer_ind = buffer_ind.view(1, -1)
+        if current_window[0] == 0:
+            aggregate_tensor = buffer_agg
+            individual_tensor = buffer_ind
+        else:
+            aggregate_tensor = torch.cat((aggregate_tensor, buffer_agg), 0)
+            individual_tensor = torch.cat((individual_tensor, buffer_ind), 0)
+
+        current_window[0] += stride
+        current_window[1] += stride
+    return aggregate_tensor, individual_tensor
+
+def generate_clean_data(data_dir, appliance, window_size):
+    """Generator of clean data where each appliance activation is fully captured and many times randomly positioned within a window.
+        Args:
+            data_dir: relative path from current directory to a directory where houses from REDD dataset are contained
+            appliance: string containing the name of appliance with first letter as a capital letter
+            window_size: integer specifying the size of the window in which the data will be contained
+    """
+    #homes = read_all_homes(data_dir)
+    #aggregate and iam lists for tageted device type - the content will vary depending on target appliance
+    aggregate_channels = [] #aggregate_channels are usually the same for all appliances
+    individual_channels = [] #individual channels for appliances
+    activations = [] #activation list's content will depend on appliance
+    non_activations = [] #non-activation list which is filled for most of appliances.
+    if appliance == 'Refrigerator':
+        #h1: channel_5; h2: channel_9; h3: channel_7; h6: channel_8
+        channels = [['h1', 'channel_5.dat'], ['h2', 'channel_9.dat'], ['h3', 'channel_7.dat'], ['h6', 'channel_8.dat']] #channels and houses from which fridge data is read
+        for house, channel in channels:
+            channel1 = data_dir + house + '/channel_1.dat'
+            channel2 = data_dir + house + '/channel_2.dat'
+            channel3 = data_dir + house + '/' + channel
+            aggregate, iam = downsampled_channels(channel1, channel2, channel3) #downsampling aggregate data so that it contains all timestamps as iam data
+            aggregate, iam = np.array(aggregate['Individual_usage']), np.array(iam['Individual_usage']) #converting downsampled pandas.Dataframes to numpy arrays
+            aggregate_channels.append(aggregate) #appending the aggregate to aggregate list and iam to iam list so that their indices match
+            individual_channels.append(iam)
+        for channel in individual_channels: #iterating through frigde power usage in each house
+            activations_for_house = [] #buffer list to fill all activations detected in iam
+            for i in range(len(channel)):
+                start = 0
+                end = 0
+                if channel[i] > 10: #if power is above threshold power that may possibly be an activation
+                    start = i
+                    while channel[i] > 10 and i < len(channel) - 1:
+                        i += 1 #increasing index indicator until it reaches the value below threshold
+                    end = i
+                    if end - start > 1000: #if the number of samples between start and end is bigger than threshold value then it's an activation
+                        activation = [start, end]
+                        activations_for_house.append(activation) #appending activation start and end time to buffer of activations for house
+            activations.append(activations_for_house) #appending whole bufer to list of activations of specific appliance in all houses used for loading activations
+
+        agg, iam = [], []
+        #init = True
+        for i in range(len(aggregate_channels)):
+            #iterating through aggregate data of each house
+            print('Number of activations in this channel: ', len(activations[i]))
+            for start, end in activations[i]:
+                #then iterating through activation positions in specified house [i]
+                for j in range(3):
+                    #randomly generate windows #n times with one activation
+                    activation_size = end - start
+                    #randomly positioning activation in window
+                    start_aggregate = start - random.randint(0, window_size - activation_size)
+                    #if start_aggregate + window_size < len(aggregate_channels[i]):
+                    agg_buff, iam_buff = aggregate_channels[i][start_aggregate: start_aggregate + window_size], individual_channels[i][start_aggregate: start_aggregate + window_size]
+                    agg_buff, iam_buff = np.copy(agg_buff), np.copy(iam_buff)
+                    n = random.randint(0, 10)
+                    # if n %2 == 1:
+                    #     agg_buff -= iam_buff
+                    #     agg_buff[agg_buff < 50] = 50
+                    #     iam_buff = np.zeros(window_size)
+
+                    agg.append(agg_buff)
+                    iam.append(iam_buff)
+        zipper = list(zip(agg, iam))
+        random.shuffle(zipper)
+        agg, iam = zip(*zipper)
+        # random.shuffle(agg)
+        # random.shuffle(iam)
+        agg, iam = np.array(agg), np.array(iam)
+        dataset = [agg, iam]
+        return dataset
+        #print(activations)
+    elif appliance == 'Dishwasher':
+        channels = [['h1', 'channel_6.dat'], ['h2', 'channel_10.dat'], ['h3', 'channel_9.dat'], ['h4', 'channel_15.dat']] #channels and houses from which dishwasher data is read
+        for house, channel in channels:
+            channel1 = data_dir + house + '/channel_1.dat'
+            channel2 = data_dir + house + '/channel_2.dat'
+            channel3 = data_dir + house + '/' + channel
+            aggregate, iam = downsampled_channels(channel1, channel2, channel3) #downsampling aggregate data so that it contains all timestamps as iam data
+            aggregate, iam = np.array(aggregate['Individual_usage']), np.array(iam['Individual_usage']) #converting downsampled pandas.Dataframes to numpy arrays
+            aggregate_channels.append(aggregate) #appending the aggregate to aggregate list and iam to iam list so that their indices match
+            individual_channels.append(iam)
+        for channel in individual_channels: #iterating through frigde power usage in each house
+            activations_for_house = [] #buffer list to fill all activations detected in iam
+            non_activations_for_house = [] #buffer list to fill all activations detected in iam
+            non_activation_samples = 0
+            for i in range(len(channel)):
+                start = 0
+                end = 0
+                if channel[i] > 10: #if power is above threshold power that may possibly be an activation
+                    if non_activation_samples > window_size:
+                        non_activations_for_house.append([i - non_activation_samples, i-1])
+                    non_activation_samples = 0
+                    start = i
+                    while channel[i] > 10 and i < len(channel) - 1:
+                        i += 1 #increasing index indicator until it reaches the value below threshold
+                    end = i
+                    if end - start > 300: #if the number of samples between start and end is bigger than threshold value then it's an activation
+                        activation = [start, end]
+                        activations_for_house.append(activation) #appending activation start and end time to buffer of activations for house
+                else:
+                    non_activation_samples += 1
+            activations.append(activations_for_house) #appending whole bufer to list of activations of specific appliance in all houses used for loading activations
+            non_activations.append(non_activations_for_house)
+        agg, iam = [], []
+        for i in range(len(aggregate_channels)):
+            #iterating through aggregate data of each house
+            print('Number of activations in this channel: ', len(activations[i]))
+            print('Number of non-activations in this channel: ', len(non_activations[i]))
+            for start, end in activations[i]:
+                #then iterating through activation positions in specified house [i]
+                for j in range(5):
+                    #randomly generate windows #n times with one activation
+                    activation_size = end - start
+                    #randomly positioning activation in window
+                    start_aggregate = start - random.randint(0, window_size - activation_size)
+                    #if start_aggregate + window_size < len(aggregate_channels[i]):
+                    agg_buff, iam_buff = aggregate_channels[i][start_aggregate: start_aggregate + window_size], individual_channels[i][start_aggregate: start_aggregate + window_size]
+                    agg_buff, iam_buff = np.copy(agg_buff), np.copy(iam_buff)
+                    agg.append(agg_buff)
+                    iam.append(iam_buff)
+            for start, end in non_activations[i]:
+                for j in range(100):
+                    window_start = random.randint(start, end - window_size)
+                    agg_buff, iam_buff = aggregate_channels[i][window_start: window_start + window_size], individual_channels[i][window_start: window_start + window_size]
+                    agg_buff, iam_buff = np.copy(agg_buff), np.copy(iam_buff)
+                    agg.append(agg_buff)
+                    iam.append(iam_buff)
+
+        zipper = list(zip(agg, iam))
+        random.shuffle(zipper)
+        agg, iam = zip(*zipper)
+        # random.shuffle(agg)
+        # random.shuffle(iam)
+        agg, iam = np.array(agg), np.array(iam)
+        dataset = [agg, iam]
+        return dataset
+    elif appliance == 'Microwave':
+        channels = [['h1', 'channel_11.dat'], ['h2', 'channel_6.dat'], ['h3', 'channel_16.dat']] #channels and houses from which microwave data is read
+        for house, channel in channels:
+            channel1 = data_dir + house + '/channel_1.dat'
+            channel2 = data_dir + house + '/channel_2.dat'
+            channel3 = data_dir + house + '/' + channel
+            aggregate, iam = downsampled_channels(channel1, channel2, channel3) #downsampling aggregate data so that it contains all timestamps as iam data
+            aggregate, iam = np.array(aggregate['Individual_usage']), np.array(iam['Individual_usage']) #converting downsampled pandas.Dataframes to numpy arrays
+            aggregate_channels.append(aggregate) #appending the aggregate to aggregate list and iam to iam list so that their indices match
+            individual_channels.append(iam)
+        for channel in individual_channels: #iterating through frigde power usage in each house
+            activations_for_house = [] #buffer list to fill all activations detected in iam
+            non_activations_for_house = [] #buffer list to fill all activations detected in iam
+            non_activation_samples = 0
+            for i in range(len(channel)):
+                start = 0
+                end = 0
+                if channel[i] > 10: #if power is above threshold power that may possibly be an activation
+                    if non_activation_samples > window_size:
+                        non_activations_for_house.append([i - non_activation_samples, i-1])
+                    non_activation_samples = 0
+                    start = i
+                    while channel[i] > 10 and i < len(channel) - 1:
+                        i += 1 #increasing index indicator until it reaches the value below threshold
+                    end = i
+                    if end - start > 100 and end - start < window_size: #if the number of samples between start and end is bigger than threshold value then it's an activation
+                        activation = [start, end]
+                        activations_for_house.append(activation) #appending activation start and end time to buffer of activations for house
+                else:
+                    non_activation_samples += 1
+            activations.append(activations_for_house) #appending whole bufer to list of activations of specific appliance in all houses used for loading activations
+            non_activations.append(non_activations_for_house)
+        agg, iam = [], []
+        for i in range(len(aggregate_channels)):
+            #iterating through aggregate data of each house
+            print('Number of activations in this channel: ', len(activations[i]))
+            print('Number of non-activations in this channel: ', len(non_activations[i]))
+            for start, end in activations[i]:
+                #then iterating through activation positions in specified house [i]
+                for j in range(5):
+                    #randomly generate windows #n times with one activation
+                    activation_size = end - start
+                    #randomly positioning activation in window
+                    start_aggregate = start - random.randint(0, window_size - activation_size)
+                    #if start_aggregate + window_size < len(aggregate_channels[i]):
+                    agg_buff, iam_buff = aggregate_channels[i][start_aggregate: start_aggregate + window_size], individual_channels[i][start_aggregate: start_aggregate + window_size]
+                    agg_buff, iam_buff = np.copy(agg_buff), np.copy(iam_buff)
+                    agg.append(agg_buff)
+                    iam.append(iam_buff)
+            for start, end in non_activations[i]:
+                for j in range(10):
+                    window_start = random.randint(start, end - window_size)
+                    agg_buff, iam_buff = aggregate_channels[i][window_start: window_start + window_size], individual_channels[i][window_start: window_start + window_size]
+                    agg_buff, iam_buff = np.copy(agg_buff), np.copy(iam_buff)
+                    # agg.append(agg_buff)
+                    # iam.append(iam_buff)
+
+        zipper = list(zip(agg, iam))
+        random.shuffle(zipper)
+        agg, iam = zip(*zipper)
+        # random.shuffle(agg)
+        # random.shuffle(iam)
+        agg, iam = np.array(agg), np.array(iam)
+        dataset = [agg, iam]
+        return dataset
+    return None
