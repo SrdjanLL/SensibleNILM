@@ -13,15 +13,17 @@ import torchvision
 
 #Creating custom dataset
 refrigerator_train_set = REDDCleanDataset(data_dir="data/REDD/", appliance='Refrigerator', window_size=REFRIGERATOR_WINDOW_SIZE)
+refrigerator_test_set = REDDCleanDataset(data_dir="data/REDD/", appliance='Refrigerator', window_size=REFRIGERATOR_WINDOW_SIZE, test=True)
 #Getting mean and standard deviation so that Normalization can be performed
 mean, std = refrigerator_train_set.get_mean_and_std()
 refrigerator_train_set.init_transformation(torchvision.transforms.Compose([Normalize(mean=mean, sd=std)]))
-print('Dataset size: ', len(refrigerator_train_set))
-
+refrigerator_test_set.init_transformation(torchvision.transforms.Compose([Normalize(mean=mean, sd=std)]))
+print('Training set size: ', len(refrigerator_train_set))
+print('Test set size: ', len(refrigerator_test_set))
 #Splitting dataset into training and test set
 train_examples_count = round(len(refrigerator_train_set) * 0.8)
-refrigerator_trainloader = torch.utils.data.DataLoader(refrigerator_train_set, batch_size=1, sampler=torch.utils.data.sampler.SubsetRandomSampler(range(train_examples_count)), num_workers=2)
-refrigerator_testloader = torch.utils.data.DataLoader(refrigerator_train_set, batch_size=1, sampler=torch.utils.data.sampler.SubsetRandomSampler(range(train_examples_count, len(refrigerator_train_set))),num_workers=2)
+refrigerator_trainloader = torch.utils.data.DataLoader(refrigerator_train_set, batch_size=1, num_workers=2)
+refrigerator_testloader = torch.utils.data.DataLoader(refrigerator_test_set, batch_size=1,num_workers=2)
 
 #Initialization of neural network
 net = ConvNILM()
@@ -31,7 +33,7 @@ criterion = nn.MSELoss()
 optimimizer = optim.SGD(net.parameters(), lr = 0.001, momentum=0.9)
 
 print("Start of training: ")
-for epoch in range(1):
+for epoch in range(2):
     running_loss = 0.0
     for i, data in enumerate(refrigerator_trainloader, 0):
         #Get the inputs

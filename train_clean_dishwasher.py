@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from parameters import *
-import data
+from data import *
 from dataset import *
 from matplotlib import pyplot as plt
 from transformations import Normalize
@@ -10,26 +10,6 @@ import torch.optim as optim
 from models import *
 from torch.autograd import Variable
 import torchvision
-
-def show_example(aggregate, individual):
-    plt.plot(range(1, 4 * DISHWASHER_WINDOW_SIZE, 4), aggregate.numpy(), 'C1', label='Aggregate usage')
-    plt.plot(range(1, 4 * DISHWASHER_WINDOW_SIZE, 4), individual.numpy(), 'C2', label='Individual usage')
-    plt.tight_layout()
-    plt.legend()
-    plt.show()
-
-def show_output(aggregate, individual, output, label):
-    if torch.cuda.is_available():
-        aggregate= aggregate.cpu()
-        individual = individual.cpu()
-    plt.plot(range(1, 4 * DISHWASHER_WINDOW_SIZE, 4), aggregate.numpy(), 'C1', label='Aggregate usage')
-    plt.plot(range(1, 4 * DISHWASHER_WINDOW_SIZE, 4), individual.numpy(), 'C2', label='Individual usage')
-    plt.plot(range(1, 4 * DISHWASHER_WINDOW_SIZE, 4), [label for i in range(DISHWASHER_WINDOW_SIZE)], 'C3', label='Real average usage')
-    plt.plot(range(1, 4 * DISHWASHER_WINDOW_SIZE, 4), [output for i in range(DISHWASHER_WINDOW_SIZE)], 'C4', label='Predicted average usage')
-
-    plt.tight_layout()
-    plt.legend()
-    plt.show()
 
 dishwasher_train_set = REDDCleanDataset(data_dir="data/REDD/", appliance='Dishwasher', window_size=DISHWASHER_WINDOW_SIZE)
 mean, std = dishwasher_train_set.get_mean_and_std()
@@ -74,26 +54,55 @@ for epoch in range(10):
 
 print('Finished Training')
 
-score_mae = None
 
+score_mae = None #Mean absolute error
+score_ptecc = 0 #Proportion of total energy correctly classified
+denominator = 0 #denominator for score_ptecc metric and MNE
+score_mne = 0 #Mean normalised error
+mne_estimated = 0
+mne_label = 0
+count = 0
+score_mse = 0 #Mean Squared Error
 for i, data in enumerate(dishwasher_testloader, 0):
+    count += 1
     inputs, labels = data
     label = torch.Tensor([labels.mean()]).float()
     inputs = inputs.view(1, -1, DISHWASHER_WINDOW_SIZE)
     if torch.cuda.is_available():
         inputs, labels, label = inputs.cuda(), labels.cuda(), label.cuda()
+
     inputs = Variable(inputs.float())
     outputs = net(inputs)
     output = outputs.data * std + mean
     label = label * std + mean
     err = sum(torch.abs(output-label))
+
+    #mse
+    mse_err = sum(pow(torch.abs(output - label),2))
+    score_mse += mse_err
+    #ptec
+    score_ptecc += torch.abs(output - label)
+    denominator += label
+
+    #mne
+    mne_estimated += output
+    mne_label += label
     if i==0 :
         score_mae = err
     else :
         score_mae = torch.cat((score_mae, err), 0)
 
+score_ptecc /= 2 * denominator
+score_ptecc = (1 - score_ptecc) * 100
 score_mae = score_mae.mean()
+score_mne = torch.abs(mne_estimated - mne_label)/denominator
+score_mse /= count
+print('Proportion of energy correctly classified: ', score_ptecc[0][0], '%')
 print('Mean absolute error: ', score_mae)
+print('Mean normalised error: ', score_mne[0][0])
+print('Mean Squared Error: ', score_mse[0])
+print('Root Mean Squared Error: ', torch.sqrt(score_mse)[0])
+#Ploting some random test examples - visualization of neural network's results
 dataiter = iter(dishwasher_testloader)
 for i in range(30):
     aggregate, labels = dataiter.next()
@@ -104,4 +113,4 @@ for i in range(30):
         inputs, labels = inputs.cuda(), labels.cuda()
     inputs = Variable(inputs.float())
     outputs = net(inputs)
-    show_output(aggregate=aggregate[0], individual=labels[0], output=outputs.data[0][0], label=label)
+    show_output(aggregate=aggregate[0], individual=labels[0], output=outputs.data[0][0], label=label, window_size=DISHWASHER_WINDOW_SIZE)

@@ -11,56 +11,54 @@ from models import *
 from torch.autograd import Variable
 import torchvision
 
-#Creating custom dataset
-refrigerator_train_set = REDDCleanDataset(data_dir="data/REDD/", appliance='Refrigerator', window_size=REFRIGERATOR_WINDOW_SIZE)
-#Getting mean and standard deviation so that Normalization can be performed
-mean, std = refrigerator_train_set.get_mean_and_std()
-refrigerator_train_set.init_transformation(torchvision.transforms.Compose([Normalize(mean=mean, sd=std)]))
-print('Dataset size: ', len(refrigerator_train_set))
+# dishwasher_train_set = REDDCleanDataset(data_dir="data/REDD/", appliance='Dishwasher', window_size=DISHWASHER_WINDOW_SIZE, proportion=[3, 900], threshold=10)
+# dishwasher_test_set = REDDCleanDataset(data_dir="data/REDD/", appliance='Dishwasher', window_size=DISHWASHER_WINDOW_SIZE, test=True)
+train_set, test_set = generate_clean_data2(data_dir="data/REDD/", appliance='Dishwasher', window_size=DISHWASHER_WINDOW_SIZE, proportion=[4, 1000], threshold=10, test=True, test_on='h1')
+dishwasher_train_set = REDDDataset(data=train_set)
+dishwasher_test_set = REDDDataset(data=test_set)
+mean, std = dishwasher_train_set.get_mean_and_std()
+dishwasher_train_set.init_transformation(torchvision.transforms.Compose([Normalize(mean=mean, sd=std)]))
+dishwasher_test_set.init_transformation(torchvision.transforms.Compose([Normalize(mean=mean, sd=std)]))
+print('Training set size: ', len(dishwasher_train_set))
+print('Test set size:', len(dishwasher_test_set))
+dishwasher_trainloader = torch.utils.data.DataLoader(dishwasher_train_set, batch_size=1, num_workers=2)
+dishwasher_testloader = torch.utils.data.DataLoader(dishwasher_test_set, batch_size=1, num_workers=2)
 
-#Splitting dataset into training and test set
-train_examples_count = round(len(refrigerator_train_set) * 0.8)
-refrigerator_trainloader = torch.utils.data.DataLoader(refrigerator_train_set, batch_size=1, sampler=torch.utils.data.sampler.SubsetRandomSampler(range(train_examples_count)), num_workers=2)
-refrigerator_testloader = torch.utils.data.DataLoader(refrigerator_train_set, batch_size=1, sampler=torch.utils.data.sampler.SubsetRandomSampler(range(train_examples_count, len(refrigerator_train_set))),num_workers=2)
-
-#Initialization of neural network
-net = ConvNILM()
+net = ConvDishNILM()
 if torch.cuda.is_available():
     net = net.cuda()
+
 criterion = nn.MSELoss()
 optimimizer = optim.SGD(net.parameters(), lr = 0.001, momentum=0.9)
 
 print("Start of training: ")
-for epoch in range(1):
+for epoch in range(3):
     running_loss = 0.0
-    for i, data in enumerate(refrigerator_trainloader, 0):
+    for i, data in enumerate(dishwasher_trainloader, 0):
         #Get the inputs
         inputs, labels = data
         label = torch.Tensor([labels.mean()]).float()
-        inputs = inputs.view(1, -1, REFRIGERATOR_WINDOW_SIZE)
+        inputs = inputs.view(1, -1, DISHWASHER_WINDOW_SIZE)
         if torch.cuda.is_available():
             inputs, labels, label = inputs.cuda(), labels.cuda(), label.cuda()
-
-        #Wrapping into torch.autograd.Variables - required for pytorch framework so that backpropagation can be performed
         inputs = Variable(inputs.float())
-
         #Zero the parameter gradients
         optimimizer.zero_grad()
-
         #forward + backward + optimimizer
         outputs = net(inputs)
         loss = criterion(outputs, Variable(label))
         loss.backward()
         optimimizer.step()
-
         #Print statistics
         running_loss += loss.data[0]
-        if i % 500 == 499:
+        if i % 1000 == 999:
             print('[%d, %5d] loss: %.3f' %
-                  (epoch + 1, i + 1, running_loss / 500))
+                  (epoch + 1, i + 1, running_loss / 1000))
             running_loss = 0.0
 
 print('Finished Training')
+
+
 score_mae = None #Mean absolute error
 score_ptecc = 0 #Proportion of total energy correctly classified
 denominator = 0 #denominator for score_ptecc metric and MNE
@@ -69,11 +67,11 @@ mne_estimated = 0
 mne_label = 0
 count = 0
 score_mse = 0 #Mean Squared Error
-for i, data in enumerate(refrigerator_testloader, 0):
+for i, data in enumerate(dishwasher_testloader, 0):
     count += 1
     inputs, labels = data
     label = torch.Tensor([labels.mean()]).float()
-    inputs = inputs.view(1, -1, REFRIGERATOR_WINDOW_SIZE)
+    inputs = inputs.view(1, -1, DISHWASHER_WINDOW_SIZE)
     if torch.cuda.is_available():
         inputs, labels, label = inputs.cuda(), labels.cuda(), label.cuda()
 
@@ -108,16 +106,16 @@ print('Mean absolute error: ', score_mae)
 print('Mean normalised error: ', score_mne[0][0])
 print('Mean Squared Error: ', score_mse[0])
 print('Root Mean Squared Error: ', torch.sqrt(score_mse)[0])
-#Ploting some random test examples - visualization of neural network's results
+#Ploting test examples - visualization of neural network's results
 
-dataiter = iter(refrigerator_testloader)
-for i in range(30):
+dataiter = iter(dishwasher_testloader)
+for i in range(len(dishwasher_testloader)):
     aggregate, labels = dataiter.next()
     label = labels.float().mean()
     inputs = aggregate
-    inputs = inputs.view(1, -1, REFRIGERATOR_WINDOW_SIZE)
+    inputs = inputs.view(1, -1, DISHWASHER_WINDOW_SIZE)
     if torch.cuda.is_available():
         inputs, labels = inputs.cuda(), labels.cuda()
     inputs = Variable(inputs.float())
     outputs = net(inputs)
-    show_output(aggregate=aggregate[0], individual=labels[0], output=outputs.data[0][0], label=label, window_size=REFRIGERATOR_WINDOW_SIZE)
+    show_output(aggregate=aggregate[0], individual=labels[0], output=outputs.data[0][0], label=label, window_size=DISHWASHER_WINDOW_SIZE)
