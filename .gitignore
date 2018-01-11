@@ -1,3 +1,9 @@
 data/ECODataSet/
 data/REDD/
+data/CLEAN_REFIT/
 __pycache__/
+redd/models/
+redd/__pycache__/
+redd/redd_results.txt
+refit/models/
+refit/__pycache__/

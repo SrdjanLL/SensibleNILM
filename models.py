@@ -3,28 +3,9 @@ import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
 
-#First model that was trained, terrible
-class LinearNILM(nn.Module):
-
-    def __init__(self, input_size, hidden_size, output_size):
-        super(LinearNILM, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
-        self.fc3 = nn.Linear(hidden_size, hidden_size)
-        self.fc4 = nn.Linear(hidden_size, output_size)
-
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = F.relu(self.fc3(x))
-        x = self.fc4(x)
-        return x
-
-
-class ConvNILM(nn.Module):
-
+class ConvFridgeNILM(nn.Module):
     def __init__(self):
-        super(ConvNILM, self).__init__()
+        super(ConvFridgeNILM, self).__init__()
         #First set of conv layers
         self.conv1 = nn.Conv1d(1, 16, 5)
         self.bn1 = nn.BatchNorm1d(16)
@@ -110,48 +91,6 @@ class ConvDishNILM(nn.Module):
         x = F.relu(self.out4(x))
         x = self.out5(x)
         #x = self.out3(x)
-
-        return x
-
-class ConvDishNILM2(nn.Module):
-
-    def __init__(self):
-        super(ConvDishNILM2, self).__init__()
-        #First set of conv layers
-        self.conv1 = nn.Conv1d(1, 16, 5)
-        self.bn1 = nn.BatchNorm1d(16)
-        self.conv2 = nn.Conv1d(16, 16, 3)
-        self.bn2 = nn.BatchNorm1d(16)
-        self.conv3 = nn.Conv1d(16, 16, 3)
-        self.bn3 = nn.BatchNorm1d(16)
-        self.pool = nn.AvgPool1d(4, stride=2)
-        self.drop = nn.Dropout(p = 0.15, inplace=True)
-        self.out1 = nn.Linear(16 * 75, 1024)
-
-        #self.out1 = nn.Linear(16 * 36, 4096) #Refrigerator with 3 conv layers only
-        self.out2 = nn.Linear(1024, 1)
-
-
-    def num_flat_features(self, x):
-        size = x.size()[1:] #all dimensions except the batch dimensions
-        num_features = 1
-        for s in size:
-            num_features *= s
-        return num_features
-
-    def forward(self, x):
-        #First to implement feedforward network with first set of conv layers
-        x = F.relu(self.pool(self.bn1(self.conv1(x))))
-        x = F.relu(self.pool(self.bn2(self.conv2(x))))
-        x = F.relu(self.pool(self.bn3(self.conv3(x))))
-        #print('Size of x after 3 convolutional layers: ', x.size())
-
-        x = x.view(-1, self.num_flat_features(x))
-        #x = self.drop(F.relu(self.out1(x)))
-        x = self.drop(F.leaky_relu(self.out1(x)))
-        x = self.out2(x)
-        #x = self.out3(x)
-
         return x
 
 class ConvMicroNILM(nn.Module):
@@ -191,32 +130,34 @@ class ConvMicroNILM(nn.Module):
 
         x = x.view(-1, self.num_flat_features(x))
         #x = self.drop(F.relu(self.out1(x)))
-        x = F.relu(self.drop(self.out1(x)))
-        x = F.relu(self.drop(self.out2(x)))
-        x = F.relu(self.drop(self.out3(x)))
-        x = F.relu(self.drop(self.out4(x)))
+        x = F.relu(self.out1(x))
+        x = F.relu(self.out2(x))
+        x = F.relu(self.out3(x))
+        x = F.relu(self.out4(x))
         x = self.out5(x)
         #x = self.out3(x)
 
         return x
-class ConvMicroNILM2(nn.Module):
 
+class RefitConvFridgeNILM(nn.Module):
     def __init__(self):
-        super(ConvMicroNILM2, self).__init__()
+        super(RefitConvFridgeNILM, self).__init__()
         #First set of conv layers
-        self.conv1 = nn.Conv1d(1, 16, 5)
-        self.bn1 = nn.BatchNorm1d(16)
-        self.conv2 = nn.Conv1d(16, 16, 3)
-        self.bn2 = nn.BatchNorm1d(16)
-        self.conv3 = nn.Conv1d(16, 16, 3)
-        self.bn3 = nn.BatchNorm1d(16)
-        self.pool = nn.MaxPool1d(4, stride=2)
-        self.drop = nn.Dropout(p = 0.15, inplace=True)
-        self.out1 = nn.Linear(16 * 33, 1024) #33
+        self.conv1 = nn.Conv1d(1, 32, 5)
+        self.bn1 = nn.BatchNorm1d(32)
+        self.conv2 = nn.Conv1d(32, 32, 3)
+        self.bn2 = nn.BatchNorm1d(32)
+        self.conv3 = nn.Conv1d(32, 32, 3)
+        self.bn3 = nn.BatchNorm1d(32)
+        self.pool = nn.AvgPool1d(4, stride=2)
+        self.drop = nn.Dropout(p = 0.2)
+        self.out1 = nn.Linear(32 * 146, 4096)
 
         #self.out1 = nn.Linear(16 * 36, 4096) #Refrigerator with 3 conv layers only
-        self.out2 = nn.Linear(1024, 1)
-
+        self.out2 = nn.Linear(4096, 3072)
+        self.out3 = nn.Linear(3072, 2048)
+        self.out4 = nn.Linear(2048, 512)
+        self.out5 = nn.Linear(512, 1)
 
     def num_flat_features(self, x):
         size = x.size()[1:] #all dimensions except the batch dimensions
@@ -227,16 +168,63 @@ class ConvMicroNILM2(nn.Module):
 
     def forward(self, x):
         #First to implement feedforward network with first set of conv layers
-        x = F.relu(self.drop(self.pool(self.bn1(self.conv1(x)))))
+        x = self.pool(self.bn1(self.conv1(x)))
+        x = self.pool(self.bn2(self.conv2(x)))
+        x = self.pool(self.bn3(self.conv3(x)))
+        #print('Size of x after 3 convolutional layers: ', x.size())
+
+        x = x.view(-1, self.num_flat_features(x))
+        #x = self.drop(F.relu(self.out1(x)))
+        x = F.relu(self.out1(x))
+        x = F.relu(self.out2(x))
+        x = F.relu(self.out3(x))
+        x = F.relu(self.out4(x))
+        x = self.out5(x)
+        #x = self.out3(x)
+
+        return x
+
+class RefitConvFridgeNILM2(nn.Module):
+    def __init__(self):
+        super(RefitConvFridgeNILM2, self).__init__()
+        #First set of conv layers
+        self.conv1 = nn.Conv1d(1, 32, 5)
+        self.bn1 = nn.BatchNorm1d(32)
+        self.conv2 = nn.Conv1d(32, 16, 3)
+        self.bn2 = nn.BatchNorm1d(16)
+        self.conv3 = nn.Conv1d(16, 16, 3)
+        self.bn3 = nn.BatchNorm1d(16)
+        self.pool = nn.AvgPool1d(4, stride=2)
+        self.drop = nn.Dropout(p = 0.2)
+        self.out1 = nn.Linear(16 * 146, 4096)
+
+        #self.out1 = nn.Linear(16 * 36, 4096) #Refrigerator with 3 conv layers only
+        self.out2 = nn.Linear(4096, 4096)
+        self.out3 = nn.Linear(4096, 4096)
+        self.out4 = nn.Linear(4096, 4096)
+        self.out5 = nn.Linear(4096, 1)
+
+    def num_flat_features(self, x):
+        size = x.size()[1:] #all dimensions except the batch dimensions
+        num_features = 1
+        for s in size:
+            num_features *= s
+        return num_features
+
+    def forward(self, x):
+        #First to implement feedforward network with first set of conv layers
+        x = F.relu(self.pool(self.bn1(self.conv1(x))))
         x = F.relu(self.pool(self.bn2(self.conv2(x))))
         x = F.relu(self.pool(self.bn3(self.conv3(x))))
         # print('Size of x after 3 convolutional layers: ', x.size())
 
         x = x.view(-1, self.num_flat_features(x))
         #x = self.drop(F.relu(self.out1(x)))
-        x = F.relu(self.drop(self.out1(x)))
-        x = self.out2(x)
-
+        x = F.relu(self.out1(x))
+        x = F.relu(self.out2(x))
+        x = F.relu(self.out3(x))
+        x = F.relu(self.out4(x))
+        x = self.out5(x)
         #x = self.out3(x)
 
         return x
