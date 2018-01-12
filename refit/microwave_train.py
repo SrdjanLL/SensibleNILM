@@ -13,7 +13,8 @@ from models import *
 from torch.autograd import Variable
 import torchvision
 import scores
-
+import pickle
+import pandas as pd
 #Choosing on which houses network will be tested
 test = ['House4']
 
@@ -45,8 +46,8 @@ criterion = nn.MSELoss()
 #Stohastic Gradient Descent with learning rate 0.001 and momentum 0.9
 optimimizer = optim.SGD(net.parameters(), lr = 0.001, momentum=0.9)
 
-#training_houses = {"House4":"Appliance1"}
-# house, channel = 'House1', 'Appliance1'
+training_houses = {"House4":"Appliance1"}
+
 #Training starts here
 test_index = 0
 print("Start of training: ")

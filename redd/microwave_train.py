@@ -14,7 +14,7 @@ from torch.autograd import Variable
 import torchvision
 import scores
 #Initialization of dataset
-train_set, test_set = data.generate_clean_data(data_dir="data/REDD/", appliance='Microwave', window_size=params.MICROWAVE_WINDOW_SIZE, proportion=[15, 0], threshold=200, test=True, test_on='All') #stride=1
+train_set, test_set = data.generate_clean_data(data_dir="../data/REDD/", appliance='Microwave', window_size=params.MICROWAVE_WINDOW_SIZE, proportion=[15, 0], threshold=200, test=True, test_on='All') #stride=1
 
 # initialization of custom pytorch datasets
 microwave_train_set = dataset.REDDDataset(data=train_set)

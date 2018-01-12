@@ -14,7 +14,7 @@ from torch.autograd import Variable
 import torchvision
 import scores
 #Creating custom dataset
-train_set, test_set = data.generate_clean_data(data_dir="data/REDD/", appliance='Refrigerator', window_size=params.REFRIGERATOR_WINDOW_SIZE, proportion=[0, 0], threshold=80, test=True, test_on='All') #stride=5
+train_set, test_set = data.generate_clean_data(data_dir="../data/REDD/", appliance='Refrigerator', window_size=params.REFRIGERATOR_WINDOW_SIZE, proportion=[0, 0], threshold=80, test=True, test_on='All') #stride=5
 
 # initialization of custom pytorch datasets
 refrigerator_train_set = dataset.REDDDataset(data=train_set)

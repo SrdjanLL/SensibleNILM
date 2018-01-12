@@ -13,6 +13,8 @@ from models import *
 from torch.autograd import Variable
 import torchvision
 import scores
+import pickle
+import pandas as pd
 
 #Choosing on which houses network will be tested
 test = ['House1', 'House2', 'House3']
@@ -52,18 +54,18 @@ test_index = 0
 print("Start of training: ")
 for house in training_houses.keys():
     channel = training_houses[house]
-    best_model = RefitConvDishNILM()
-    try:
-        best_model = torch.load('models/refit_dishwasher_trained_model'+house+'.pt')
-    except FileNotFoundError:
-        print('There is no pretrained model.')
-        best_model = RefitConvDishNILM()
+    # best_model = RefitConvDishNILM()
+    # try:
+    #     best_model = torch.load('models/refit_dishwasher_trained_model'+house+'.pt')
+    # except FileNotFoundError:
+    #     print('There is no pretrained model.')
+    #     best_model = RefitConvDishNILM()
     net = RefitConvDishNILM()
 
     #If cuda is available everything will be processed on cuda
     if torch.cuda.is_available():
         net = net.cuda()
-        best_model = best_model.cuda()
+        # best_model = best_model.cuda()
 
     testset_df = pd.read_csv('../data/CLEAN_REFIT/CLEAN_' + test[test_index] + '.csv', skiprows=range(1,round(0.8 * house_lengths[test[test_index]])))
     agg, iam = np.copy(np.array(testset_df['Aggregate'])), np.copy(np.array(testset_df[params.dishwasher_channels[test[test_index]]]))
@@ -78,8 +80,8 @@ for house in training_houses.keys():
     #Setting up Normalization transformation of each item returned by the testset object
     testset.init_transformation(torchvision.transforms.Compose([Normalize(mean=mean, sd=std)]))
     #Evaluation of best model - before start of training
-    best_model.eval()
-    best_scores= scores.get_scores(best_model, testset, 1, params.DISHWASHER_WINDOW_SIZE, std, mean)
+    # best_model.eval()
+    # best_scores= scores.get_scores(best_model, testset, 1, params.DISHWASHER_WINDOW_SIZE, std, mean)
 
     #Mean Squared error is chosen as a loss function
     criterion = nn.MSELoss()

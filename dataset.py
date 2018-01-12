@@ -2,7 +2,6 @@ import torch
 import torch.utils.data as torch_data
 import pandas as pd
 import numpy as np
-from refit_parameters import *
 import math
 
 class RefitDataset(torch_data.Dataset):
@@ -57,4 +56,4 @@ class REDDDataset(torch_data.Dataset):
             sample['Individual'] = iam
             aggregate, iam = self.transform(sample)
         aggregate, iam = torch.from_numpy(aggregate), torch.from_numpy(iam)
-return aggregate, iam
+        return aggregate, iam

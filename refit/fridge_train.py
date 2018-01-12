@@ -13,6 +13,8 @@ from models import *
 from torch.autograd import Variable
 import torchvision
 import scores
+import pickle
+import pandas as pd
 #Choosing on which houses network will be tested
 test = ['House4']
 
@@ -104,8 +106,8 @@ for house in training_houses.keys():
     #Setting up Normalization transformation of each item returned by the testset object
     testset.init_transformation(torchvision.transforms.Compose([Normalize(mean=mean, sd=std)]))
     #Evaluation of best model - before start of training
-    best_model.eval()
-    best_scores= scores.get_scores(best_model, testset, 1, params.REFRIGERATOR_WINDOW_SIZE, std, mean)
+    # best_model.eval()
+    # best_scores= scores.get_scores(best_model, testset, 1, params.REFRIGERATOR_WINDOW_SIZE, std, mean)
 
     #Mean Squared error is chosen as a loss function
     criterion = nn.MSELoss()

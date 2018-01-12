@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from refit_parameters import *
 import matplotlib.pyplot as plt
-
+import random
 
 def create_windows(agg, iam, window_size):
     #Creating padding so the last row of numpy.array can fit to window size for specified appliance
