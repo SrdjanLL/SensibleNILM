@@ -34,7 +34,7 @@ microwave_testloader = torch.utils.data.DataLoader(microwave_test_set, batch_siz
 #Initialization of neural network
 best_model = ConvMicroNILM()
 try:
-    best_model = torch.load('models/microwave_trained_model1.pt')
+    best_model = torch.load('models/microwave_trained_model.pt')
 except FileNotFoundError:
     print('There is no pretrained model')
 net = ConvMicroNILM()
@@ -79,11 +79,11 @@ for epoch in range(15):
     if scores.compare_scores(best_scores, new_scores) > 0:
         best_model.load_state_dict(net.state_dict())
         best_scores = new_scores
-        torch.save(best_model, 'models/microwave_trained_model1.pt')
+        torch.save(best_model, 'models/microwave_trained_model.pt')
         print('Best trained model')
     print('-------------------------------------------\n\n')
 print('Finished Training')
-torch.save(best_model, 'models/microwave_trained_model1.pt')
+torch.save(best_model, 'models/microwave_trained_model.pt')
 net.eval()
 last_scores = scores.get_scores(net, microwave_test_set, 1, params.MICROWAVE_WINDOW_SIZE, std, mean)
 dataiter = iter(microwave_testloader)

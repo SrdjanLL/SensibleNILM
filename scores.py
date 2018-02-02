@@ -118,7 +118,7 @@ def get_scores(net, test_set, batch_size, window_size, std, mean):
     score_mne = mne_score(net, test_set, 1, window_size, std, mean)
     score_mae = mae_score(net, test_set, 1, window_size, std, mean)
     scores= {'accuracy': score_accuracy[0], 'rmse':score_rmse[0], 'mne':score_mne[0],'mae':score_mae[0]}
-    print('Proportion of energy correctly classified: ', score_accuracy[0], '%')
+    print('Accuracy: ', score_accuracy[0], '%')
     print('Root mean squared error: ', score_rmse[0])
     print('Mean Normalized Error: ', score_mne[0])
     print('Mean Absolute Error: ', score_mae[0])

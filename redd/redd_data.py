@@ -82,7 +82,42 @@ def downsampled_channels(_aggregate1, _aggregate2, _individual_appliance, read=T
     #print("Aggregate data length: ", len(aggregate), ", Individual appliance length: ", len(individual_appliance))
     return aggregate, individual_appliance
 
-def generate_clean_data(data_dir, appliance, window_size, threshold, proportion=[1,1],test=False, test_on='All'):
+def read_from_home(data_dir, house, appliance, window_size):
+    channel1 = data_dir + house + '/channel_1.dat'
+    channel2 = data_dir + house + '/channel_2.dat'
+    if appliance == 'Refrigerator':
+        if house == 'h1':
+            channel = 'channel_5.dat'
+        elif house == 'h2':
+            channel = 'channel_9.dat'
+        elif house == 'h3':
+            channel = 'channel_7.dat'
+        elif house == 'h6':
+            channel = 'channel_8.dat'
+    elif appliance == 'Dishwasher':
+        if house == 'h1':
+            channel = 'channel_6.dat'
+        elif house == 'h3':
+            channel = 'channel_9.dat'
+        elif house == 'h4':
+            channel = 'channel_15.dat'
+        elif house == 'h2':
+            channel = 'channel_10.dat'
+    elif appliance == 'Microwave':
+        if house == 'h1':
+            channel = 'channel_11.dat'
+        elif house == 'h2':
+            channel = 'channel_6.dat'
+        elif house == 'h3':
+            channel = 'channel_16.dat'
+    channel3 = data_dir + house + '/' + channel
+    aggregate, iam = downsampled_channels(channel1, channel2, channel3) #downsampling aggregate data so that it contains all timestamps as iam data
+    aggregate, iam = np.array(aggregate['Individual_usage']), np.array(iam['Individual_usage']) #converting downsampled pandas.Dataframes to numpy arrays
+    aggregate, iam = create_windows(aggregate[:], iam[:], window_size=window_size)
+    return [aggregate, iam]
+
+
+def generate_clean_data(data_dir, appliance, window_size, threshold, proportion=[1,1],test=False, test_on='All', stride=1):
     activation_proportion = proportion[0]
     non_activation_proportion = proportion[1]
     aggregate_channels = []
@@ -121,7 +156,7 @@ def generate_clean_data(data_dir, appliance, window_size, threshold, proportion=
                 iam = iam[:split]
         aggregate_channels.append(aggregate) #appending the aggregate to aggregate list and iam to iam list so that their indices match
         individual_channels.append(iam)
-    for channel in individual_channels: #iterating through frigde power usage in each house
+    for channel in individual_channels: #iterating through iam's power usage in each house
         activations_for_house = [] #buffer list to fill all activations detected in iam
         non_activations_for_house = []
         non_activation_samples = 0
@@ -148,7 +183,7 @@ def generate_clean_data(data_dir, appliance, window_size, threshold, proportion=
         #iterating through aggregate data of each house
         print('Number of activations in this channel: ', len(activations[i]))
         print('Number of non-activations in this channel: ', len(non_activations[i]))
-        agg_windows, iam_windows = create_overlap_windows(aggregate_channels[i], individual_channels[i], window_size, stride=5)
+        agg_windows, iam_windows = create_overlap_windows(aggregate_channels[i], individual_channels[i], window_size, stride=stride)
         agg.extend(agg_windows)
         iam.extend(iam_windows)
         for start, end in activations[i]:
